@@ -63,6 +63,63 @@ Records user agreement to terms and privacy policies. Must be completed before a
   }
   ```
 
+### User Login
+Authenticates a user and returns a JWT access token to be used on all subsequent protected requests.
+- **URL**: `/auth/login`
+- **Method**: `POST`
+- **Auth Required**: None
+- **Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "securepassword"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Login successful.",
+    "access_token": "eyJhbGciOi...",
+    "refresh_token": "...",
+    "expires_at": 1234567890,
+    "user": {
+      "id": "uuid-string",
+      "full_name": "John Doe",
+      "role": "patient",
+      "email": "user@example.com"
+    }
+  }
+  ```
+
+### Get Current User Profile
+Returns the profile of the currently authenticated user.
+- **URL**: `/auth/me`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Response**: `200 OK`
+  ```json
+  {
+    "user": {
+      "id": "uuid-string",
+      "role": "patient",
+      "full_name": "John Doe",
+      "display_name": null,
+      "is_active": true,
+      "created_at": "2026-05-28T00:00:00Z"
+    }
+  }
+  ```
+
+### Logout
+Invalidates the current session token.
+- **URL**: `/auth/logout`
+- **Method**: `POST`
+- **Auth Required**: Yes
+- **Response**: `200 OK`
+  ```json
+  { "message": "Logged out successfully." }
+  ```
+
 ---
 
 ## 2. Mood Logging
@@ -118,7 +175,7 @@ Logs a mood for the day or updates the existing entry for today.
 ## 3. Journaling
 
 ### Submit Journal Entry
-Saves a journal entry and asynchronously triggers Gemini AI analysis.
+Saves a journal entry. **AI analysis is NOT triggered automatically.** Analysis only occurs after a counselor submits a report request (`POST /reports/request`) and the admin approves it (`PATCH /reports/admin/:requestId`).
 - **URL**: `/journal`
 - **Method**: `POST`
 - **Auth Required**: Yes (Role: `patient`)
@@ -132,7 +189,7 @@ Saves a journal entry and asynchronously triggers Gemini AI analysis.
 - **Response**: `201 Created`
   ```json
   {
-    "message": "Journal entry saved. AI analysis is processing in the background.",
+    "message": "Journal entry saved successfully.",
     "entry_id": "uuid-string"
   }
   ```
@@ -419,3 +476,83 @@ Aggregates pending requests, user metrics, and recent audit logs.
 - **Method**: `GET`
 - **Auth Required**: Yes (Role: `admin`)
 - **Response**: `200 OK`
+
+---
+
+## 10. Patients (Counselor)
+
+### Get Assigned Patients (Paginated)
+Returns a paginated list of all patients assigned to the authenticated counselor. Each patient record is enriched with their latest mood log and any currently active/scheduled session.
+- **URL**: `/patients`
+- **Method**: `GET`
+- **Auth Required**: Yes (Role: `counselor`)
+- **Query Params**:
+  | Param | Type | Default | Description |
+  |---|---|---|---|
+  | `page` | Integer | `1` | Page number (1-indexed) |
+  | `limit` | Integer | `10` | Results per page (max: 50) |
+  | `search` | String | — | Filter by patient full name (case-insensitive) |
+- **Response**: `200 OK`
+  ```json
+  {
+    "patients": [
+      {
+        "id": "uuid-string",
+        "full_name": "Jane Student",
+        "display_name": null,
+        "gender": "female",
+        "section_or_grade": "Grade 11",
+        "school_or_org": "Sample High School",
+        "profile_photo_url": null,
+        "is_active": true,
+        "created_at": "2026-05-01T00:00:00Z",
+        "latest_mood": {
+          "mood": "low",
+          "logged_at": "2026-05-28T08:00:00Z"
+        },
+        "active_session": {
+          "id": "uuid-string",
+          "status": "scheduled",
+          "scheduled_at": "2026-05-30T10:00:00Z",
+          "request_type": "proactive"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 25,
+      "total_pages": 3,
+      "has_next": true,
+      "has_prev": false
+    }
+  }
+  ```
+
+### Get Single Assigned Patient Details
+Returns the full profile of a specific assigned patient, enriched with their recent mood history, sessions, and AI reports.
+- **URL**: `/patients/:patientId`
+- **Method**: `GET`
+- **Auth Required**: Yes (Role: `counselor`)
+- **URL Params**: `patientId` — UUID of the target patient
+- **Response**: `200 OK`
+  ```json
+  {
+    "patient": {
+      "id": "uuid-string",
+      "full_name": "Jane Student",
+      "gender": "female",
+      "date_of_birth": "2008-04-15",
+      "section_or_grade": "Grade 11",
+      "school_or_org": "Sample High School",
+      "is_active": true,
+      "assigned_since": "2026-05-01T00:00:00Z"
+    },
+    "recent_moods": [ ... ],
+    "recent_sessions": [ ... ],
+    "recent_ai_reports": [ ... ]
+  }
+  ```
+- **Error Responses**:
+  - `403 Forbidden` — Counselor is not assigned to the requested patient
+  - `404 Not Found` — Patient profile does not exist
