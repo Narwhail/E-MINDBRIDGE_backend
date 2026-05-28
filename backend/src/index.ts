@@ -26,9 +26,25 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
+  const originalJson = res.json;
+  let responseBody: any = null;
+
+  // Intercept res.json to capture response bodies (especially error messages)
+  res.json = function (body) {
+    responseBody = body;
+    return originalJson.call(this, body);
+  };
+
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    let logMsg = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`;
+
+    if (res.statusCode >= 400 && responseBody) {
+      const errorMsg = responseBody.error || responseBody.message || JSON.stringify(responseBody);
+      logMsg += ` ⚠️ Error: "${errorMsg}"`;
+    }
+
+    console.log(logMsg);
   });
   next();
 });
