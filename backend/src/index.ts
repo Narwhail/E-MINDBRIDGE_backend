@@ -13,6 +13,7 @@ import sessionRoutes from './routes/sessions';
 import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
 import dashboardRoutes from './routes/dashboard';
+import patientRoutes from './routes/patients';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,6 +65,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/patients', patientRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
