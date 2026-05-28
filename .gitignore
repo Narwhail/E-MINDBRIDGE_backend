@@ -1,0 +1,6 @@
+frontend/src/App.svelte
+frontend/src/pages/Booking.svelte
+frontend/src/pages/Chat.svelte
+frontend/src/pages/Dashboard.svelte
+frontend/src/pages/Login.svelte
+frontend/src/pages/Signup.svelte
