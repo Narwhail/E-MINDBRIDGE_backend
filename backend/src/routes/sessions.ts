@@ -1,6 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../supabase';
 import { authenticate, requireRole } from '../middleware/auth';
+import { v4 as uuidv4 } from 'uuid';
+
+// ─── Jitsi Helper ─────────────────────────────────────────────────────────────
+
+/**
+ * Generates a unique, deterministic Jitsi Meet room URL for a session.
+ * Uses the public meet.jit.si server (configurable via JITSI_DOMAIN env var).
+ */
+function generateRoomUrl(): string {
+  const domain = process.env.JITSI_DOMAIN || 'meet.jit.si';
+  const roomName = `EMindBridge-${uuidv4()}`;
+  return `https://${domain}/${roomName}`;
+}
 
 const router = Router();
 
@@ -129,16 +142,18 @@ router.post('/proactive', requireRole('patient'), async (req: Request, res: Resp
     }
   }
 
-  // INSERT counseling_sessions
+  // INSERT counseling_sessions — status is pending_confirmation until counselor accepts
+  // Room URL is NOT generated yet; it will be created when the counselor confirms.
   const { data: session, error } = await supabaseAdmin
     .from('counseling_sessions')
     .insert({
       patient_id: patient.id,
       counselor_id: counselorId,
       request_type: 'proactive',
-      status: 'scheduled',
+      status: 'pending_confirmation',
       scheduled_at: preferred_date,
       low_bandwidth_mode: true,
+      room_url: null,
       session_notes: notes || null,
     })
     .select('id, scheduled_at')
@@ -149,38 +164,142 @@ router.post('/proactive', requireRole('patient'), async (req: Request, res: Resp
     return;
   }
 
-  // Notify counselor of the patient request
+  // Notify counselor of the patient request — they must confirm or decline
   await supabaseAdmin.from('notifications').insert({
     recipient_id: counselorId,
     type: 'session_scheduled',
-    title: 'Session Request from Patient',
-    body: `A patient has requested a counseling session on ${new Date(preferred_date).toLocaleString()}.`,
+    title: '📅 Session Request — Confirmation Required',
+    body: `A patient has requested a counseling session on ${new Date(preferred_date).toLocaleString()}. Please confirm or decline in your dashboard.`,
     related_session_id: session.id,
   });
 
-  // Confirm to patient
+  // Confirm to patient that the request was submitted and awaiting counselor
   await supabaseAdmin.from('notifications').insert({
     recipient_id: patient.id,
     type: 'session_scheduled',
     title: 'Session Request Submitted',
-    body: `Your session request has been submitted for ${new Date(preferred_date).toLocaleString()}. Your counselor will confirm shortly.`,
+    body: `Your session request for ${new Date(preferred_date).toLocaleString()} has been submitted. You'll be notified once your counselor confirms.`,
     related_session_id: session.id,
   });
 
   await supabaseAdmin.from('audit_logs').insert({
     actor_id: patient.id,
-    action: 'session_scheduled',
+    action: 'session_requested',
     target_table: 'counseling_sessions',
     target_id: session.id,
     metadata: { type: 'proactive', counselor_id: counselorId },
   });
 
   res.status(201).json({
-    message: 'Session requested successfully.',
+    message: 'Session requested successfully. Awaiting counselor confirmation.',
     session_id: session.id,
     counselor_id: counselorId,
     scheduled_at: session.scheduled_at,
+    status: 'pending_confirmation',
     was_auto_assigned: !existingAssignment,
+  });
+});
+
+/**
+ * PF-09: Counselor confirms or declines a pending session request
+ * PATCH /api/sessions/:sessionId/confirm
+ * Body: { action: 'accept' | 'decline', decline_reason?: string }
+ */
+router.patch('/:sessionId/confirm', requireRole('counselor'), async (req: Request, res: Response): Promise<void> => {
+  const counselor = (req as any).user;
+  const { sessionId } = req.params;
+  const { action, decline_reason } = req.body;
+
+  if (!['accept', 'decline'].includes(action)) {
+    res.status(400).json({ error: 'action must be "accept" or "decline".' });
+    return;
+  }
+
+  // Fetch the session and verify it belongs to this counselor and is pending
+  const { data: session, error: fetchErr } = await supabaseAdmin
+    .from('counseling_sessions')
+    .select('id, patient_id, counselor_id, status, scheduled_at')
+    .eq('id', sessionId)
+    .eq('counselor_id', counselor.id)
+    .single();
+
+  if (fetchErr || !session) {
+    res.status(404).json({ error: 'Session not found or does not belong to you.' });
+    return;
+  }
+
+  if (session.status !== 'pending_confirmation') {
+    res.status(409).json({ error: `Session is already in status "${session.status}" and cannot be confirmed or declined.` });
+    return;
+  }
+
+  if (action === 'decline') {
+    await supabaseAdmin
+      .from('counseling_sessions')
+      .update({ status: 'cancelled', cancellation_reason: decline_reason || 'Counselor declined the session.' })
+      .eq('id', sessionId);
+
+    await supabaseAdmin.from('notifications').insert({
+      recipient_id: session.patient_id,
+      sender_id: counselor.id,
+      type: 'general',
+      title: '❌ Session Request Declined',
+      body: `Your session request for ${new Date(session.scheduled_at).toLocaleString()} was declined by your counselor${decline_reason ? `: ${decline_reason}` : '. Please request another time.'}.`,
+      related_session_id: sessionId,
+    });
+
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_id: counselor.id,
+      action: 'session_declined',
+      target_table: 'counseling_sessions',
+      target_id: sessionId,
+      metadata: { patient_id: session.patient_id, reason: decline_reason || null },
+    });
+
+    res.json({ message: 'Session declined. Patient has been notified.' });
+    return;
+  }
+
+  // ACCEPT: generate the Jitsi room URL now and mark as scheduled
+  const roomUrl = generateRoomUrl();
+
+  await supabaseAdmin
+    .from('counseling_sessions')
+    .update({ status: 'scheduled', room_url: roomUrl })
+    .eq('id', sessionId);
+
+  // Notify patient with the confirmed date and room link
+  await supabaseAdmin.from('notifications').insert({
+    recipient_id: session.patient_id,
+    sender_id: counselor.id,
+    type: 'session_scheduled',
+    title: '✅ Session Confirmed!',
+    body: `Your counseling session has been confirmed for ${new Date(session.scheduled_at).toLocaleString()}. Join here: ${roomUrl}`,
+    related_session_id: sessionId,
+  });
+
+  // Also notify counselor themselves as a reminder
+  await supabaseAdmin.from('notifications').insert({
+    recipient_id: counselor.id,
+    type: 'session_scheduled',
+    title: '✅ You confirmed a session',
+    body: `Session confirmed for ${new Date(session.scheduled_at).toLocaleString()}. Room: ${roomUrl}`,
+    related_session_id: sessionId,
+  });
+
+  await supabaseAdmin.from('audit_logs').insert({
+    actor_id: counselor.id,
+    action: 'session_confirmed',
+    target_table: 'counseling_sessions',
+    target_id: sessionId,
+    metadata: { patient_id: session.patient_id, room_url: roomUrl },
+  });
+
+  res.json({
+    message: 'Session confirmed. Jitsi room created and patient notified.',
+    session_id: sessionId,
+    scheduled_at: session.scheduled_at,
+    room_url: roomUrl,
   });
 });
 
@@ -212,6 +331,7 @@ router.post('/reactive', requireRole('counselor'), async (req: Request, res: Res
     return;
   }
 
+  const roomUrl = generateRoomUrl();
   const { data: session, error } = await supabaseAdmin
     .from('counseling_sessions')
     .insert({
@@ -220,9 +340,10 @@ router.post('/reactive', requireRole('counselor'), async (req: Request, res: Res
       ai_report_id: ai_report_id || null,
       evaluation_id: evaluation_id || null,
       request_type: 'reactive',
-      status: 'scheduled',
+      status: 'pending_patient_confirmation',
       scheduled_at,
       low_bandwidth_mode: true,
+      room_url: null,
       session_notes: notes || null,
     })
     .select('id, scheduled_at')
@@ -233,28 +354,132 @@ router.post('/reactive', requireRole('counselor'), async (req: Request, res: Res
     return;
   }
 
-  // Notify patient
+  // Notify patient — they must accept or decline
   await supabaseAdmin.from('notifications').insert({
     recipient_id: patient_id,
     sender_id: counselor.id,
     type: 'session_scheduled',
-    title: 'Session Scheduled',
-    body: `Your counselor has scheduled a session for you on ${new Date(scheduled_at).toLocaleString()}.`,
+    title: '📅 Session Proposed — Your Confirmation Needed',
+    body: `Your counselor has proposed a counseling session for ${new Date(scheduled_at).toLocaleString()}. Please confirm or decline in your dashboard.`,
     related_session_id: session.id,
   });
 
   await supabaseAdmin.from('audit_logs').insert({
     actor_id: counselor.id,
-    action: 'session_scheduled',
+    action: 'session_proposed',
     target_table: 'counseling_sessions',
     target_id: session.id,
     metadata: { type: 'reactive', patient_id },
   });
 
   res.status(201).json({
-    message: 'Reactive session scheduled successfully.',
+    message: 'Reactive session proposed. Awaiting patient confirmation.',
     session_id: session.id,
     scheduled_at: session.scheduled_at,
+    status: 'pending_patient_confirmation',
+  });
+});
+
+/**
+ * PF-09: Patient confirms or declines a counselor-proposed reactive session
+ * PATCH /api/sessions/:sessionId/patient-confirm
+ * Body: { action: 'accept' | 'decline', decline_reason?: string }
+ */
+router.patch('/:sessionId/patient-confirm', requireRole('patient'), async (req: Request, res: Response): Promise<void> => {
+  const patient = (req as any).user;
+  const { sessionId } = req.params;
+  const { action, decline_reason } = req.body;
+
+  if (!['accept', 'decline'].includes(action)) {
+    res.status(400).json({ error: 'action must be "accept" or "decline".' });
+    return;
+  }
+
+  // Fetch the session and verify it belongs to this patient and is pending patient confirmation
+  const { data: session, error: fetchErr } = await supabaseAdmin
+    .from('counseling_sessions')
+    .select('id, patient_id, counselor_id, status, scheduled_at')
+    .eq('id', sessionId)
+    .eq('patient_id', patient.id)
+    .single();
+
+  if (fetchErr || !session) {
+    res.status(404).json({ error: 'Session not found or does not belong to you.' });
+    return;
+  }
+
+  if (session.status !== 'pending_patient_confirmation') {
+    res.status(409).json({ error: `Session is already in status "${session.status}" and cannot be confirmed or declined.` });
+    return;
+  }
+
+  if (action === 'decline') {
+    await supabaseAdmin
+      .from('counseling_sessions')
+      .update({ status: 'cancelled', cancellation_reason: decline_reason || 'Patient declined the proposed session.' })
+      .eq('id', sessionId);
+
+    await supabaseAdmin.from('notifications').insert({
+      recipient_id: session.counselor_id,
+      sender_id: patient.id,
+      type: 'general',
+      title: '❌ Proposed Session Declined',
+      body: `Your patient declined the session proposed for ${new Date(session.scheduled_at).toLocaleString()}${decline_reason ? `: ${decline_reason}` : '. Please propose another time.'}.`,
+      related_session_id: sessionId,
+    });
+
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_id: patient.id,
+      action: 'session_declined',
+      target_table: 'counseling_sessions',
+      target_id: sessionId,
+      metadata: { counselor_id: session.counselor_id, reason: decline_reason || null },
+    });
+
+    res.json({ message: 'Session declined. Your counselor has been notified.' });
+    return;
+  }
+
+  // ACCEPT: generate the Jitsi room URL now and mark as scheduled
+  const roomUrl = generateRoomUrl();
+
+  await supabaseAdmin
+    .from('counseling_sessions')
+    .update({ status: 'scheduled', room_url: roomUrl })
+    .eq('id', sessionId);
+
+  // Notify counselor the patient accepted
+  await supabaseAdmin.from('notifications').insert({
+    recipient_id: session.counselor_id,
+    sender_id: patient.id,
+    type: 'session_scheduled',
+    title: '✅ Patient Confirmed the Session',
+    body: `Your patient has confirmed the session on ${new Date(session.scheduled_at).toLocaleString()}. Join here: ${roomUrl}`,
+    related_session_id: sessionId,
+  });
+
+  // Confirm to patient with the link
+  await supabaseAdmin.from('notifications').insert({
+    recipient_id: patient.id,
+    type: 'session_scheduled',
+    title: '✅ Session Confirmed!',
+    body: `You've confirmed your counseling session on ${new Date(session.scheduled_at).toLocaleString()}. Join here: ${roomUrl}`,
+    related_session_id: sessionId,
+  });
+
+  await supabaseAdmin.from('audit_logs').insert({
+    actor_id: patient.id,
+    action: 'session_confirmed',
+    target_table: 'counseling_sessions',
+    target_id: sessionId,
+    metadata: { counselor_id: session.counselor_id, room_url: roomUrl },
+  });
+
+  res.json({
+    message: 'Session confirmed. Jitsi room created and counselor notified.',
+    session_id: sessionId,
+    scheduled_at: session.scheduled_at,
+    room_url: roomUrl,
   });
 });
 

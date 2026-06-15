@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-MindBridge Admin Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0f14; --surface: #161922; --surface-2: #1e2330; --surface-3: #252d3d;
+      --border: #2a3040; --accent: #6c8ef5; --accent-2: #8b5cf6;
+      --green: #34d399; --red: #f87171; --yellow: #fbbf24;
+      --text: #e2e8f0; --text-muted: #64748b; --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+    /* ─── Login ─── */
+    #login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh;
+      background: radial-gradient(ellipse at 60% 20%, rgba(108,142,245,.12) 0%, transparent 60%),
+                  radial-gradient(ellipse at 10% 80%, rgba(139,92,246,.08) 0%, transparent 60%), var(--bg); }
+    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 48px; width: 100%; max-width: 420px; box-shadow: 0 25px 60px rgba(0,0,0,.5); }
+    .login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
+    .login-logo-icon { width: 44px; height: 44px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .login-logo h1 { font-size: 18px; font-weight: 700; }
+    .login-logo p { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+    .login-card h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .login-card p.sub { font-size: 14px; color: var(--text-muted); margin-bottom: 32px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; }
+    .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; font-size: 14px; color: var(--text); outline: none; transition: border-color .2s; font-family: inherit; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 90px; }
+    .field select { cursor: pointer; }
+
+    /* ─── Buttons ─── */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: var(--radius); border: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,142,245,.3); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-danger  { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .btn-danger:hover  { background: rgba(248,113,113,.25); }
+    .btn-success { background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+    .btn-success:hover { background: rgba(52,211,153,.25); }
+    .btn-ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+    .btn-xs { padding: 4px 8px; font-size: 11px; border-radius: 6px; }
+    .error-msg { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.3); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--red); margin-top: 16px; display: none; }
+
+    /* ─── App shell ─── */
+    #app { display: none; min-height: 100vh; }
+    .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 240px; background: var(--surface); border-right: 1px solid var(--border); padding: 28px 0; display: flex; flex-direction: column; z-index: 100; }
+    .sidebar-logo { display: flex; align-items: center; gap: 12px; padding: 0 24px 28px; border-bottom: 1px solid var(--border); }
+    .sidebar-logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .sidebar-logo span { font-size: 14px; font-weight: 700; }
+    .sidebar-logo small { font-size: 11px; color: var(--text-muted); }
+    .nav { padding: 20px 12px; flex: 1; }
+    .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-muted); text-transform: uppercase; padding: 0 12px; margin: 16px 0 8px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-muted); transition: all .15s; margin-bottom: 2px; border: none; background: none; width: 100%; text-align: left; }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active { background: rgba(108,142,245,.15); color: var(--accent); }
+    .nav-item .icon { width: 18px; text-align: center; font-size: 16px; }
+    .sidebar-footer { padding: 16px 24px; border-top: 1px solid var(--border); }
+    .admin-badge { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .avatar { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .admin-info .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .admin-info .role { font-size: 11px; color: var(--accent); }
+    .main { margin-left: 240px; padding: 32px; min-height: 100vh; }
+
+    /* ─── Page / Table ─── */
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .page-header h2 { font-size: 22px; font-weight: 700; }
+    .page-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; transition: border-color .2s; }
+    .stat-card:hover { border-color: var(--accent); }
+    .stat-card .label { font-size: 12px; color: var(--text-muted); font-weight: 500; letter-spacing: .5px; margin-bottom: 10px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; }
+    .stat-card .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 24px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }
+    .card-header h3 { font-size: 15px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-muted); padding: 12px 20px; text-align: left; background: rgba(0,0,0,.2); border-bottom: 1px solid var(--border); }
+    td { padding: 13px 20px; font-size: 13px; border-bottom: 1px solid rgba(42,48,64,.5); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    .actions-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--text-muted); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
+
+    /* ─── Badges ─── */
+    .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .5px; white-space: nowrap; }
+    .badge-blue   { background: rgba(108,142,245,.15); color: var(--accent); }
+    .badge-green  { background: rgba(52,211,153,.15);  color: var(--green); }
+    .badge-red    { background: rgba(248,113,113,.15); color: var(--red); }
+    .badge-yellow { background: rgba(251,191,36,.15);  color: var(--yellow); }
+    .badge-gray   { background: rgba(100,116,139,.15); color: var(--text-muted); }
+    .badge-purple { background: rgba(139,92,246,.15);  color: var(--accent-2); }
+
+    /* ─── Pagination ─── */
+    .pagination { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); justify-content: space-between; font-size: 13px; color: var(--text-muted); }
+    .pagination-btns { display: flex; gap: 6px; }
+
+    /* ─── Search input ─── */
+    .search-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 14px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; width: 220px; transition: border-color .2s; }
+    .search-box:focus { border-color: var(--accent); }
+    .search-box::placeholder { color: var(--text-muted); }
+
+    /* ─── Modal ─── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 200; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 540px; box-shadow: 0 25px 60px rgba(0,0,0,.5); animation: modalIn .2s ease; max-height: 90vh; overflow-y: auto; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+
+    /* User detail card inside modal */
+    .user-detail-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 12px; font-size: 13px; }
+    .user-detail-card .udc-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+    .user-detail-card .udc-row:last-child { margin-bottom: 0; }
+    .user-detail-card .udc-label { color: var(--text-muted); min-width: 100px; font-size: 12px; }
+    .user-detail-card .udc-val { color: var(--text); font-weight: 500; word-break: break-all; }
+
+    /* ─── UUID select dropdown ─── */
+    .uuid-select-group { margin-bottom: 16px; }
+    .uuid-select-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; }
+    .uuid-select-group select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--text); outline: none; font-family: 'Courier New', monospace; cursor: pointer; }
+    .uuid-select-group select:focus { border-color: var(--accent); }
+    .uuid-select-group select option { font-family: 'Courier New', monospace; }
+
+    /* ─── Toast ─── */
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 20px; font-size: 14px; font-weight: 500; box-shadow: 0 8px 30px rgba(0,0,0,.4); transform: translateY(80px); opacity: 0; transition: all .3s ease; z-index: 300; max-width: 360px; }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(52,211,153,.4); color: var(--green); }
+    #toast.error   { border-color: rgba(248,113,113,.4); color: var(--red); }
+
+    .loader     { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+    .empty-state { text-align: center; padding: 60px 40px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🧠</div>
+      <div><h1>E-MindBridge</h1><p>Admin Console</p></div>
+    </div>
+    <h2>Welcome back</h2>
+    <p class="sub">Sign in to your administrator account to continue.</p>
+    <div class="field"><label>Email address</label><input type="email" id="login-email" placeholder="admin@emindbridge.com" autocomplete="username" /></div>
+    <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" /></div>
+    <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%">Sign In</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🧠</div>
+      <div><span>E-MindBridge</span><br/><small>Admin Console</small></div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span> Dashboard</button>
+      <div class="nav-label">Management</div>
+      <button class="nav-item" onclick="showPage('users')" id="nav-users"><span class="icon">👥</span> Users</button>
+      <button class="nav-item" onclick="showPage('assignments')" id="nav-assignments"><span class="icon">🔗</span> Assignments</button>
+      <button class="nav-item" onclick="showPage('reports')" id="nav-reports"><span class="icon">📋</span> Report Requests</button>
+      <div class="nav-label">Content</div>
+      <button class="nav-item" onclick="showPage('quotes')" id="nav-quotes"><span class="icon">💬</span> Wellness Quotes</button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <div class="avatar" id="admin-avatar">A</div>
+        <div class="admin-info"><div class="name" id="admin-name">Administrator</div><div class="role">Admin</div></div>
+      </div>
+      <button class="btn btn-ghost" style="width:100%;font-size:13px;" onclick="doLogout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header"><div><h2>Dashboard</h2><p>System-wide overview for E-MindBridge</p></div></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="label">Total Users</div><div class="value" id="stat-users">—</div><div class="sub">All accounts</div></div>
+        <div class="stat-card"><div class="label">Counselors</div><div class="value" id="stat-counselors">—</div><div class="sub">Active staff</div></div>
+        <div class="stat-card"><div class="label">Pending Reports</div><div class="value" id="stat-reports">—</div><div class="sub">Awaiting approval</div></div>
+        <div class="stat-card"><div class="label">Active Sessions</div><div class="value" id="stat-sessions">—</div><div class="sub">Scheduled</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🕵️ Audit Log — Recent Activity</h3>
+        </div>
+        <div id="recent-activity"><div class="loader">Loading audit logs…</div></div>
+        <div class="pagination" id="audit-pagination" style="display:none;margin-top:10px;">
+          <span id="audit-page-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn-ghost btn-sm" id="audit-prev" onclick="changePage('audit',-1)">← Prev</button>
+            <button class="btn btn-ghost btn-sm" id="audit-next" onclick="changePage('audit', 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USERS ── -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div><h2>User Management</h2><p>Create, edit, and manage all user accounts</p></div>
+        <button class="btn btn-primary" onclick="openCreateUserModal()">+ New User</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Users</h3>
+          <div class="toolbar">
+            <input class="search-box" type="search" id="users-search" placeholder="🔍 Search by name or UUID…" oninput="debounce(loadUsers, 350)()" style="width:250px" />
+            <select id="users-role-filter" onchange="resetAndLoad('users')" style="width:130px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+              <option value="">All Roles</option><option value="patient">Patients</option><option value="counselor">Counselors</option><option value="admin">Admins</option>
+            </select>
+            <select id="users-status-filter" onchange="resetAndLoad('users')" style="width:130px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+              <option value="">All Statuses</option><option value="true">Active</option><option value="false">Suspended</option>
+            </select>
+          </div>
+        </div>
+        <div id="users-table-body"><div class="loader">Loading users…</div></div>
+        <div class="pagination" id="users-pagination" style="display:none">
+          <span id="users-page-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn-ghost btn-sm" id="users-prev" onclick="changePage('users',-1)">← Prev</button>
+            <button class="btn btn-ghost btn-sm" id="users-next" onclick="changePage('users', 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ASSIGNMENTS ── -->
+    <div class="page" id="page-assignments">
+      <div class="page-header">
+        <div><h2>Counselor Assignments</h2><p>Manage who is assigned to whom</p></div>
+        <button class="btn btn-primary" onclick="openCreateAssignmentModal()">+ Assign Counselor</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Assignments</h3>
+          <div class="toolbar">
+            <input class="search-box" type="search" id="assignments-search" placeholder="🔍 Search patient, counselor, or UUID…" oninput="debounce(loadAssignments, 350)()" style="width:250px" />
+            <select id="assign-filter" onchange="resetAndLoad('assignments')" style="width:130px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+              <option value="">All</option><option value="true">Active</option><option value="false">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div id="assignments-table-body"><div class="loader">Loading…</div></div>
+        <div class="pagination" id="assignments-pagination" style="display:none">
+          <span id="assignments-page-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn-ghost btn-sm" id="assignments-prev" onclick="changePage('assignments',-1)">← Prev</button>
+            <button class="btn btn-ghost btn-sm" id="assignments-next" onclick="changePage('assignments', 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REPORTS ── -->
+    <div class="page" id="page-reports">
+      <div class="page-header"><div><h2>Report Requests</h2><p>Review and approve or reject counselor AI report requests</p></div></div>
+      <!-- Pending -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h3>⏳ Pending Requests</h3>
+          <input class="search-box" type="search" id="reports-search" placeholder="🔍 Search by counselor or patient…" oninput="filterReports()" />
+        </div>
+        <div id="reports-table-body"><div class="loader">Loading…</div></div>
+      </div>
+      <!-- Processed -->
+      <div class="card">
+        <div class="card-header">
+          <h3>✅ Processed Requests</h3>
+        </div>
+        <div id="processed-reports-table-body"><div class="loader">Loading…</div></div>
+        <div class="pagination" id="processed-pagination" style="display:none">
+          <span id="processed-page-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn-ghost btn-sm" id="processed-prev" onclick="changePage('processed', -1)">← Prev</button>
+            <button class="btn btn-ghost btn-sm" id="processed-next" onclick="changePage('processed', 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── QUOTES ── -->
+    <div class="page" id="page-quotes">
+      <div class="page-header">
+        <div><h2>Wellness Quotes</h2><p>Curate content shown on the patient dashboard</p></div>
+        <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ New Quote</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Quotes</h3>
+          <input class="search-box" type="search" id="quotes-search" placeholder="🔍 Search quote text…" oninput="debounce(loadQuotes, 350)()" />
+        </div>
+        <div id="quotes-table-body"><div class="loader">Loading…</div></div>
+        <div class="pagination" id="quotes-pagination" style="display:none">
+          <span id="quotes-page-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn-ghost btn-sm" id="quotes-prev" onclick="changePage('quotes',-1)">← Prev</button>
+            <button class="btn btn-ghost btn-sm" id="quotes-next" onclick="changePage('quotes', 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── MODALS ─── -->
+
+<!-- Create User -->
+<div class="modal-backdrop" id="modal-create-user">
+  <div class="modal">
+    <h3>➕ Create New User</h3>
+    <div class="field"><label>Full Name</label><input type="text" id="cu-name" placeholder="Juan Dela Cruz" /></div>
+    <div class="field"><label>Email Address</label><input type="email" id="cu-email" placeholder="user@example.com" /></div>
+    <div class="field"><label>Password</label><input type="password" id="cu-password" placeholder="Min. 8 characters" /></div>
+    <div class="field"><label>Role</label><select id="cu-role"><option value="patient">Patient</option><option value="counselor">Counselor</option><option value="admin">Admin</option></select></div>
+    <div class="field"><label>School / Organization</label><input type="text" id="cu-org" placeholder="Optional" /></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-user')">Cancel</button>
+      <button class="btn btn-primary" onclick="createUser()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Counselor — UUID dropdown + detail view -->
+<div class="modal-backdrop" id="modal-create-assignment">
+  <div class="modal">
+    <h3>🔗 Assign Counselor to Patient</h3>
+
+    <!-- Step 1: Patient selection -->
+    <div class="uuid-select-group">
+      <label>Patient — Select UUID</label>
+      <select id="ca-patient-select" onchange="onPatientSelected()">
+        <option value="">— Loading patients… —</option>
+      </select>
+    </div>
+    <div id="ca-patient-detail" class="user-detail-card" style="display:none"></div>
+
+    <hr class="divider" />
+
+    <!-- Step 2: Counselor selection -->
+    <div class="uuid-select-group">
+      <label>Counselor — Select UUID</label>
+      <select id="ca-counselor-select" onchange="onCounselorSelected()">
+        <option value="">— Loading counselors… —</option>
+      </select>
+    </div>
+    <div id="ca-counselor-detail" class="user-detail-card" style="display:none"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-assignment')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAssignment()">Assign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reassign Counselor -->
+<div class="modal-backdrop" id="modal-reassign-counselor">
+  <div class="modal">
+    <h3>🔄 Reassign Counselor</h3>
+    <input type="hidden" id="ra-assignment-id" />
+    
+    <div class="uuid-select-group">
+      <label>New Counselor — Select UUID</label>
+      <select id="ra-counselor-select" onchange="onRaCounselorSelected()">
+        <option value="">— Loading counselors… —</option>
+      </select>
+    </div>
+    <div id="ra-counselor-detail" class="user-detail-card" style="display:none"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-reassign-counselor')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReassign()">Reassign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Quote -->
+<div class="modal-backdrop" id="modal-create-quote">
+  <div class="modal">
+    <h3>💬 Add Wellness Quote</h3>
+    <div class="field"><label>Quote Text</label><textarea id="cq-text" placeholder="Enter an inspiring quote…"></textarea></div>
+    <div class="field"><label>Author</label><input type="text" id="cq-author" placeholder="Optional" /></div>
+    <div class="field"><label>Target Moods (comma-separated)</label><input type="text" id="cq-moods" placeholder="great, good, okay" /></div>
+    <div class="field"><label>Category Tags (comma-separated)</label><input type="text" id="cq-tags" placeholder="academic, grief, career" /></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-quote')">Cancel</button>
+      <button class="btn btn-primary" onclick="createQuote()">Save Quote</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Role -->
+<div class="modal-backdrop" id="modal-change-role">
+  <div class="modal">
+    <h3>✏️ Change User Role</h3>
+    <input type="hidden" id="cr-userid" />
+    <div class="field"><label>New Role</label><select id="cr-role"><option value="patient">Patient</option><option value="counselor">Counselor</option><option value="admin">Admin</option></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-change-role')">Cancel</button>
+      <button class="btn btn-primary" onclick="changeRole()">Update Role</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Quote -->
+<div class="modal-backdrop" id="modal-edit-quote">
+  <div class="modal">
+    <h3>✏️ Edit Quote</h3>
+    <input type="hidden" id="eq-id" />
+    <div class="field"><label>Quote Text</label><textarea id="eq-text"></textarea></div>
+    <div class="field"><label>Author</label><input type="text" id="eq-author" /></div>
+    <div class="field"><label>Target Moods (comma-separated)</label><input type="text" id="eq-moods" /></div>
+    <div class="field"><label>Category Tags (comma-separated)</label><input type="text" id="eq-tags" /></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-quote')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuoteEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Report -->
+<div class="modal-backdrop" id="modal-reject-report">
+  <div class="modal">
+    <h3>❌ Reject Report Request</h3>
+    <input type="hidden" id="rr-id" />
+    <div class="field"><label>Rejection Reason</label><textarea id="rr-reason" placeholder="Provide a reason for the counselor…"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-reject-report')">Cancel</button>
+      <button class="btn btn-danger" onclick="submitRejectReport()">Reject</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = '';
+let authToken = localStorage.getItem('admin_token') || '';
+let currentAdmin = null;
+
+// Page state (pagination)
+const state = {
+  users:       { page: 1, limit: 10 },
+  assignments: { page: 1, limit: 10 },
+  quotes:      { page: 1, limit: 10 },
+  audit:       { page: 1, limit: 20 },
+  processed:   { page: 1, limit: 10 },
+};
+
+// Cached dropdown data
+let dropdownUsers = { patients: [], counselors: [] };
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+(async function init() {
+  if (authToken) {
+    try {
+      const me = await apiFetch('/api/auth/me');
+      if (me.user?.role === 'admin') { currentAdmin = me.user; showApp(); return; }
+    } catch {}
+  }
+  showLogin();
+})();
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  try {
+    const data = await apiFetch('/api/auth/login', 'POST', { email, password });
+    if (data.user?.role !== 'admin') {
+      errEl.textContent = 'Access denied. This console is for administrators only.';
+      errEl.style.display = 'block'; return;
+    }
+    authToken = data.access_token || data.session?.access_token || data.token;
+    localStorage.setItem('admin_token', authToken);
+    currentAdmin = data.user;
+    showApp();
+  } catch (e) {
+    errEl.textContent = e.message || 'Login failed.';
+    errEl.style.display = 'block';
+  } finally { btn.textContent = 'Sign In'; btn.disabled = false; }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-page').style.display !== 'none') doLogin();
+});
+
+function doLogout() {
+  localStorage.removeItem('admin_token'); authToken = ''; currentAdmin = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+}
+
+function showLogin() { document.getElementById('login-page').style.display = 'flex'; document.getElementById('app').style.display = 'none'; }
+function showApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  if (currentAdmin) {
+    document.getElementById('admin-name').textContent = currentAdmin.full_name || currentAdmin.email || 'Admin';
+    document.getElementById('admin-avatar').textContent = (currentAdmin.full_name || 'A')[0].toUpperCase();
+  }
+  showPage('dashboard');
+}
+
+// ─── Navigation ────────────────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page)?.classList.add('active');
+  const loaders = { dashboard: loadDashboard, users: loadUsers, assignments: loadAssignments, reports: loadReports, quotes: loadQuotes };
+  if (loaders[page]) loaders[page]();
+}
+
+// ─── API Helper ────────────────────────────────────────────────────────────
+async function apiFetch(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json', ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {}) } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + url, opts);
+  const json = await r.json();
+  if (!r.ok) throw new Error(json.error || json.message || 'Request failed');
+  return json;
+}
+
+// ─── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+  el.className = 'show ' + type;
+  setTimeout(() => { el.className = ''; }, 3500);
+}
+
+// ─── Modals ────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+window.addEventListener('click', e => { if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open'); });
+
+// ─── Pagination helpers ────────────────────────────────────────────────────
+function resetAndLoad(page) { 
+  state[page].page = 1; 
+  ({ users: loadUsers, assignments: loadAssignments, quotes: loadQuotes, audit: () => loadDashboard(true), processed: loadProcessedReports })[page](); 
+}
+function changePage(key, delta) {
+  state[key].page = Math.max(1, state[key].page + delta);
+  ({ users: loadUsers, assignments: loadAssignments, quotes: loadQuotes, audit: () => loadDashboard(true), processed: loadProcessedReports })[key]();
+}
+function renderPagination(key, pagination) {
+  const el = document.getElementById(key + '-pagination');
+  const info = document.getElementById(key + '-page-info');
+  const prev = document.getElementById(key + '-prev');
+  const next = document.getElementById(key + '-next');
+  if (!pagination || pagination.total_count === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  info.textContent = `Page ${pagination.page} of ${pagination.total_pages} (${pagination.total_count} total)`;
+  prev.disabled = pagination.page <= 1;
+  next.disabled = pagination.page >= pagination.total_pages;
+}
+
+// ─── Debounce ──────────────────────────────────────────────────────────────
+const _timers = {};
+function debounce(fn, ms) {
+  return function(...args) {
+    clearTimeout(_timers[fn.name]);
+    _timers[fn.name] = setTimeout(() => { state[fn.name?.includes('Users') ? 'users' : fn.name?.includes('Quotes') ? 'quotes' : 'assignments'].page = 1; fn(...args); }, ms);
+  };
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────
+async function loadDashboard(onlyAudit = false) {
+  try {
+    if (!onlyAudit) {
+      const [usersData, counselorsData, reportsData, sessionsData] = await Promise.all([
+        apiFetch('/api/admin/users?limit=1'),
+        apiFetch('/api/admin/users?role=counselor&limit=1'),
+        apiFetch('/api/reports/admin/pending').catch(() => ({ report_requests: [] })),
+        apiFetch('/api/sessions').catch(() => ({ sessions: [] })),
+      ]);
+      document.getElementById('stat-users').textContent = usersData.pagination?.total_count ?? '—';
+      document.getElementById('stat-counselors').textContent = counselorsData.pagination?.total_count ?? '—';
+      document.getElementById('stat-reports').textContent = (reportsData.report_requests || []).length;
+      document.getElementById('stat-sessions').textContent = (sessionsData.sessions || []).filter(s => s.status === 'scheduled').length;
+    }
+
+    const { page, limit } = state.audit;
+    const auditUrl = `/api/admin/audit?page=${page}&limit=${limit}`;
+    const auditData = await apiFetch(auditUrl);
+    
+    state.audit.page = auditData.pagination?.page || 1;
+    renderPagination('audit', auditData.pagination);
+    
+    const logs = auditData.logs || [];
+    
+    if (!logs.length) {
+      document.getElementById('recent-activity').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No audit events found.</p></div>';
+      return;
+    }
+    
+    document.getElementById('recent-activity').innerHTML = `
+      <table>
+        <thead><tr><th>Time</th><th>Actor</th><th>Role</th><th>Action</th><th>Target Table</th><th>Target ID</th></tr></thead>
+        <tbody>${logs.map(l => `
+          <tr>
+            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${formatDate(l.created_at)}</td>
+            <td style="font-size:12px"><strong>${l.actor_name || '—'}</strong></td>
+            <td>${l.actor_role ? roleBadge(l.actor_role) : '<span class="badge badge-gray">System</span>'}</td>
+            <td><span class="badge badge-blue" style="font-size:10px">${l.action}</span></td>
+            <td style="font-size:11px;color:var(--text-muted)">${l.target_table || '—'}</td>
+            <td>${l.target_id ? `
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="mono">${l.target_id.substring(0,8)}…</span>
+                <button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${l.target_id}')" title="Copy full ID">📋</button>
+              </div>` : '—'}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    document.getElementById('recent-activity').innerHTML = `<div class="loader">⚠️ ${e.message}</div>`;
+  }
+}
+
+// ─── Users ─────────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const search = document.getElementById('users-search').value.trim();
+  const role   = document.getElementById('users-role-filter').value;
+  const status = document.getElementById('users-status-filter').value;
+  const { page, limit } = state.users;
+  let url = `/api/admin/users?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (role)   url += `&role=${role}`;
+  if (status) url += `&is_active=${status}`;
+
+  const el = document.getElementById('users-table-body');
+  el.innerHTML = '<div class="loader">Loading users…</div>';
+  try {
+    const { users, pagination } = await apiFetch(url);
+    state.users.page = pagination?.page || 1;
+    renderPagination('users', pagination);
+    if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="icon">👥</div><p>No users found.</p></div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>UUID</th><th>Name / Email</th><th>Role</th><th>Status</th><th>Org</th><th>Joined</th><th>Actions</th></tr></thead>
+      <tbody>${users.map(u => `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mono">${u.id.substring(0,8)}…</span>
+              <button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${u.id}')" title="Copy full ID">📋</button>
+            </div>
+          </td>
+          <td><strong style="font-size:13px">${u.full_name || '—'}</strong><br/><span style="font-size:11px;color:var(--text-muted)">${u.email || ''}</span></td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Suspended</span>'}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${u.school_or_org || '—'}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${formatDate(u.created_at)}</td>
+          <td><div class="actions-row">
+            <button class="btn btn-ghost btn-sm" onclick="openChangeRoleModal('${u.id}','${u.role}')">Role</button>
+            <button class="btn ${u.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleStatus('${u.id}',${!u.is_active})">${u.is_active ? 'Suspend' : 'Activate'}</button>
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="loader">⚠️ ${e.message}</div>`; }
+}
+
+function openCreateUserModal() { openModal('modal-create-user'); }
+async function createUser() {
+  const body = { full_name: document.getElementById('cu-name').value.trim(), email: document.getElementById('cu-email').value.trim(), password: document.getElementById('cu-password').value, role: document.getElementById('cu-role').value, school_or_org: document.getElementById('cu-org').value.trim() || undefined };
+  try { await apiFetch('/api/admin/users', 'POST', body); toast('User account created!'); closeModal('modal-create-user'); loadUsers(); } catch (e) { toast(e.message, 'error'); }
+}
+function openChangeRoleModal(id, role) { document.getElementById('cr-userid').value = id; document.getElementById('cr-role').value = role; openModal('modal-change-role'); }
+async function changeRole() {
+  const id = document.getElementById('cr-userid').value;
+  const role = document.getElementById('cr-role').value;
+  try { await apiFetch(`/api/admin/users/${id}/role`, 'PATCH', { role }); toast('Role updated!'); closeModal('modal-change-role'); loadUsers(); } catch (e) { toast(e.message, 'error'); }
+}
+async function toggleStatus(id, is_active) {
+  try { await apiFetch(`/api/admin/users/${id}/status`, 'PATCH', { is_active }); toast(`Account ${is_active ? 'reactivated' : 'suspended'}.`); loadUsers(); } catch (e) { toast(e.message, 'error'); }
+}
+
+// ─── Assignments ───────────────────────────────────────────────────────────
+async function loadAssignments() {
+  const search = document.getElementById('assignments-search').value.trim();
+  const filter = document.getElementById('assign-filter').value;
+  const { page, limit } = state.assignments;
+  let url = `/api/admin/assignments?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (filter) url += `&is_active=${filter}`;
+
+  const el = document.getElementById('assignments-table-body');
+  el.innerHTML = '<div class="loader">Loading…</div>';
+  try {
+    const { assignments, pagination } = await apiFetch(url);
+    state.assignments.page = pagination?.page || 1;
+    renderPagination('assignments', pagination);
+    if (!assignments.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🔗</div><p>No assignments found.</p></div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>Patient UUID</th><th>Patient Name</th><th>Counselor UUID</th><th>Counselor Name</th><th>Type</th><th>Status</th><th>Assigned</th><th>Actions</th></tr></thead>
+      <tbody>${assignments.map(a => `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mono">${a.patient_id.substring(0,8)}…</span>
+              <button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${a.patient_id}')" title="Copy full ID">📋</button>
+            </div>
+          </td>
+          <td style="font-size:12px">${a.patient?.full_name || '—'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mono">${a.counselor_id.substring(0,8)}…</span>
+              <button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${a.counselor_id}')" title="Copy full ID">📋</button>
+            </div>
+          </td>
+          <td style="font-size:12px">${a.counselor?.full_name || '—'}</td>
+          <td>${typeBadge(a.assignment_type)}</td>
+          <td>${a.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${formatDate(a.assigned_at)}</td>
+          <td><div class="actions-row">
+            ${a.is_active ? `<button class="btn btn-ghost btn-sm" onclick="openReassignModal('${a.id}')">Reassign</button>` : ''}
+            ${a.is_active ? `<button class="btn btn-danger btn-sm" onclick="deactivateAssignment('${a.id}')">Deactivate</button>` : '—'}
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="loader">⚠️ ${e.message}</div>`; }
+}
+
+async function openCreateAssignmentModal() {
+  openModal('modal-create-assignment');
+  // Reset
+  document.getElementById('ca-patient-detail').style.display = 'none';
+  document.getElementById('ca-counselor-detail').style.display = 'none';
+
+  const pSel = document.getElementById('ca-patient-select');
+  const cSel = document.getElementById('ca-counselor-select');
+  pSel.innerHTML = '<option value="">— Loading… —</option>';
+  cSel.innerHTML = '<option value="">— Loading… —</option>';
+
+  try {
+    const data = await apiFetch('/api/admin/assignments/users');
+    dropdownUsers = data;
+
+    pSel.innerHTML = '<option value="">— Select a patient UUID —</option>' +
+      data.patients.map(p => `<option value="${p.id}">${p.id} — ${p.full_name}</option>`).join('');
+
+    cSel.innerHTML = '<option value="">— Select a counselor UUID —</option>' +
+      data.counselors.map(c => `<option value="${c.id}">${c.id} — ${c.full_name}${c.is_available ? '' : ' (unavailable)'}</option>`).join('');
+  } catch (e) {
+    pSel.innerHTML = `<option value="">⚠️ ${e.message}</option>`;
+    cSel.innerHTML = `<option value="">⚠️ ${e.message}</option>`;
+  }
+}
+
+function onPatientSelected() {
+  const id = document.getElementById('ca-patient-select').value;
+  const el = document.getElementById('ca-patient-detail');
+  if (!id) { el.style.display = 'none'; return; }
+  const p = dropdownUsers.patients.find(u => u.id === id);
+  if (!p) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="udc-row"><span class="udc-label">UUID</span><span class="udc-val mono">${p.id}</span></div>
+    <div class="udc-row"><span class="udc-label">Name</span><span class="udc-val">${p.full_name || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Email</span><span class="udc-val">${p.email || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Role</span><span class="udc-val">${roleBadge('patient')}</span></div>`;
+}
+
+function onCounselorSelected() {
+  const id = document.getElementById('ca-counselor-select').value;
+  const el = document.getElementById('ca-counselor-detail');
+  if (!id) { el.style.display = 'none'; return; }
+  const c = dropdownUsers.counselors.find(u => u.id === id);
+  if (!c) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="udc-row"><span class="udc-label">UUID</span><span class="udc-val mono">${c.id}</span></div>
+    <div class="udc-row"><span class="udc-label">Name</span><span class="udc-val">${c.full_name || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Email</span><span class="udc-val">${c.email || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Available</span><span class="udc-val">${c.is_available ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-red">No — unavailable</span>'}</span></div>
+    <div class="udc-row"><span class="udc-label">Specialties</span><span class="udc-val">${(c.specialties||[]).length ? c.specialties.map(s=>`<span class="badge badge-purple" style="margin:2px">${s}</span>`).join('') : '—'}</span></div>`;
+}
+
+async function createAssignment() {
+  const patient_id  = document.getElementById('ca-patient-select').value;
+  const counselor_id = document.getElementById('ca-counselor-select').value;
+  if (!patient_id || !counselor_id) { toast('Please select both a patient and a counselor.', 'error'); return; }
+  try { await apiFetch('/api/admin/assignments', 'POST', { patient_id, counselor_id }); toast('Counselor assigned!'); closeModal('modal-create-assignment'); loadAssignments(); } catch (e) { toast(e.message, 'error'); }
+}
+
+async function openReassignModal(assignmentId) {
+  openModal('modal-reassign-counselor');
+  document.getElementById('ra-assignment-id').value = assignmentId;
+  document.getElementById('ra-counselor-detail').style.display = 'none';
+  const cSel = document.getElementById('ra-counselor-select');
+  cSel.innerHTML = '<option value="">— Loading… —</option>';
+
+  try {
+    // If we haven't loaded dropdown users yet, load them
+    if (!dropdownUsers.counselors.length) {
+      dropdownUsers = await apiFetch('/api/admin/assignments/users');
+    }
+    cSel.innerHTML = '<option value="">— Select a new counselor UUID —</option>' +
+      dropdownUsers.counselors.map(c => `<option value="${c.id}">${c.id} — ${c.full_name}${c.is_available ? '' : ' (unavailable)'}</option>`).join('');
+  } catch (e) {
+    cSel.innerHTML = `<option value="">⚠️ ${e.message}</option>`;
+  }
+}
+
+function onRaCounselorSelected() {
+  const id = document.getElementById('ra-counselor-select').value;
+  const el = document.getElementById('ra-counselor-detail');
+  if (!id) { el.style.display = 'none'; return; }
+  const c = dropdownUsers.counselors.find(u => u.id === id);
+  if (!c) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="udc-row"><span class="udc-label">UUID</span><span class="udc-val mono">${c.id}</span></div>
+    <div class="udc-row"><span class="udc-label">Name</span><span class="udc-val">${c.full_name || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Email</span><span class="udc-val">${c.email || '—'}</span></div>
+    <div class="udc-row"><span class="udc-label">Available</span><span class="udc-val">${c.is_available ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-red">No — unavailable</span>'}</span></div>
+    <div class="udc-row"><span class="udc-label">Specialties</span><span class="udc-val">${(c.specialties||[]).length ? c.specialties.map(s=>`<span class="badge badge-purple" style="margin:2px">${s}</span>`).join('') : '—'}</span></div>`;
+}
+
+async function submitReassign() {
+  const assignmentId = document.getElementById('ra-assignment-id').value;
+  const new_counselor_id = document.getElementById('ra-counselor-select').value;
+  if (!new_counselor_id) { toast('Please select a new counselor.', 'error'); return; }
+  try {
+    await apiFetch(`/api/admin/assignments/${assignmentId}/reassign`, 'PATCH', { new_counselor_id });
+    toast('Counselor reassigned successfully!');
+    closeModal('modal-reassign-counselor');
+    loadAssignments();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deactivateAssignment(id) {
+  if (!confirm('Deactivate this assignment?')) return;
+  try { await apiFetch(`/api/admin/assignments/${id}/deactivate`, 'PATCH', { reason: 'admin_deactivated' }); toast('Assignment deactivated.'); loadAssignments(); } catch (e) { toast(e.message, 'error'); }
+}
+
+// ─── Reports ───────────────────────────────────────────────────────────────
+let allPendingReports = [];
+
+async function loadReports() {
+  const el = document.getElementById('reports-table-body');
+  el.innerHTML = '<div class="loader">Loading…</div>';
+  try {
+    const data = await apiFetch('/api/reports/admin/pending');
+    allPendingReports = data.report_requests || data.requests || [];
+    renderReportsTable(allPendingReports);
+  } catch (e) { el.innerHTML = `<div class="loader">⚠️ ${e.message}</div>`; }
+  // Also load processed in parallel
+  loadProcessedReports();
+}
+
+async function loadProcessedReports() {
+  const el = document.getElementById('processed-reports-table-body');
+  el.innerHTML = '<div class="loader">Loading…</div>';
+  const { page, limit } = state.processed;
+  try {
+    const data = await apiFetch(`/api/reports/admin/processed?page=${page}&limit=${limit}`);
+    state.processed.page = data.pagination?.page || 1;
+    renderPagination('processed', data.pagination);
+    const requests = data.requests || [];
+    if (!requests.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No processed requests yet.</p></div>';
+      return;
+    }
+    const statusBadge = s => ({
+      fulfilled: '<span class="badge badge-green">Fulfilled</span>',
+      approved:  '<span class="badge badge-blue">Approved</span>',
+      rejected:  '<span class="badge badge-red">Rejected</span>',
+    })[s] || `<span class="badge badge-gray">${s}</span>`;
+    el.innerHTML = `<table>
+      <thead><tr><th>Status</th><th>Counselor ID</th><th>Patient ID</th><th>Date Range</th><th>Reason</th><th>Reviewed</th><th>Report ID</th></tr></thead>
+      <tbody>${requests.map(r => `
+        <tr>
+          <td>${statusBadge(r.status)}</td>
+          <td><div style="display:flex;align-items:center;gap:5px"><span class="mono">${(r.requested_by||'').substring(0,8)}…</span><button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${r.requested_by}')" title="Copy counselor ID">📋</button></div></td>
+          <td><div style="display:flex;align-items:center;gap:5px"><span class="mono">${(r.patient_id||'').substring(0,8)}…</span><button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${r.patient_id}')" title="Copy patient ID">📋</button></div></td>
+          <td style="font-size:11px;color:var(--text-muted)">${formatDate(r.date_range_start)} → ${formatDate(r.date_range_end)}</td>
+          <td style="font-size:12px;color:var(--text-muted);max-width:200px">${r.reason || '—'}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${r.reviewed_at ? formatDate(r.reviewed_at) : '—'}</td>
+          <td>${r.fulfilled_report_id ? `<div style="display:flex;align-items:center;gap:5px"><span class="mono">${r.fulfilled_report_id.substring(0,8)}…</span><button class="btn btn-ghost btn-xs" onclick="copyToClipboard('${r.fulfilled_report_id}')" title="Copy report ID">📋</button></div>` : '—'}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="loader">⚠️ ${e.message}</div>`; }
+}
+
+function filterReports() {
+  const search = document.getElementById('reports-search').value.toLowerCase();
+  if (!search) { renderReportsTable(allPendingReports); return; }
+  const filtered = allPendingReports.filter(r => 
+    (r.counselor?.full_name || r.requested_by || '').toLowerCase().includes(search) ||
+    (r.patient?.full_name || r.patient_id || '').toLowerCase().includes(search)
+  );
+  renderReportsTable(filtered);
+}
+
+function renderReportsTable(reports) {
+  const el = document.getElementById('reports-table-body');
+  if (!reports.length) { el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No pending report requests.</p></div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Counselor</th><th>Patient</th><th>Date Range</th><th>Reason</th><th>Submitted</th><th>Actions</th></tr></thead>
+    <tbody>${reports.map(r => `
+      <tr>
+        <td style="font-size:12px">${r.counselor?.full_name || r.requested_by || '—'}</td>
+        <td style="font-size:12px">${r.patient?.full_name || r.patient_id || '—'}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${formatDate(r.date_range_start)} → ${formatDate(r.date_range_end)}</td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:220px">${r.reason || '—'}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${formatDate(r.created_at)}</td>
+        <td><div class="actions-row">
+          <button class="btn btn-success btn-sm" onclick="approveReport('${r.id}')">Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="openRejectModal('${r.id}')">Reject</button>
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function approveReport(id) {
+  if (!confirm('Approve this report request? This will trigger AI report generation.')) return;
+  try { await apiFetch(`/api/reports/admin/${id}`, 'PATCH', { action: 'approve' }); toast('Report approved! AI generation started.'); loadReports(); } catch (e) { toast(e.message, 'error'); }
+}
+function openRejectModal(id) { document.getElementById('rr-id').value = id; document.getElementById('rr-reason').value = ''; openModal('modal-reject-report'); }
+async function submitRejectReport() {
+  const id = document.getElementById('rr-id').value;
+  const rejection_reason = document.getElementById('rr-reason').value.trim();
+  if (!rejection_reason) { toast('Please provide a rejection reason.', 'error'); return; }
+  try { await apiFetch(`/api/reports/admin/${id}`, 'PATCH', { action: 'reject', rejection_reason }); toast('Report rejected.'); closeModal('modal-reject-report'); loadReports(); } catch (e) { toast(e.message, 'error'); }
+}
+
+// ─── Quotes ────────────────────────────────────────────────────────────────
+async function loadQuotes() {
+  const search = document.getElementById('quotes-search').value.trim();
+  const { page, limit } = state.quotes;
+  let url = `/api/admin/quotes?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+
+  const el = document.getElementById('quotes-table-body');
+  el.innerHTML = '<div class="loader">Loading…</div>';
+  try {
+    const { quotes, pagination } = await apiFetch(url);
+    state.quotes.page = pagination?.page || 1;
+    renderPagination('quotes', pagination);
+    if (!quotes.length) { el.innerHTML = '<div class="empty-state"><div class="icon">💬</div><p>No quotes found.</p></div>'; return; }
+    // Store quotes in a JS-accessible variable so Edit buttons can reference by index safely
+    window._quotesCache = quotes;
+    el.innerHTML = `<table>
+      <thead><tr><th>Quote</th><th>Author</th><th>Moods</th><th>Tags</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${quotes.map((q, idx) => `
+        <tr>
+          <td style="max-width:260px;font-size:13px">"${q.content}"</td>
+          <td style="font-size:12px;color:var(--text-muted)">${q.author || '—'}</td>
+          <td><div style="display:flex;flex-wrap:wrap;gap:4px">${(q.mood_targets||[]).map(m=>`<span class="badge badge-purple">${m}</span>`).join('')}</div></td>
+          <td><div style="display:flex;flex-wrap:wrap;gap:4px">${(q.tags||[]).map(c=>`<span class="badge badge-blue">${c}</span>`).join('')}</div></td>
+          <td>${q.is_active !== false ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>'}</td>
+          <td><div class="actions-row">
+            <button class="btn btn-ghost btn-sm" onclick="openEditQuoteModal(window._quotesCache[${idx}])">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteQuote('${q.id}')">Delete</button>
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="loader">⚠️ ${e.message}</div>`; }
+}
+
+function openCreateQuoteModal() { openModal('modal-create-quote'); }
+async function createQuote() {
+  const body = { content: document.getElementById('cq-text').value.trim(), author: document.getElementById('cq-author').value.trim() || undefined, mood_targets: document.getElementById('cq-moods').value.split(',').map(s=>s.trim()).filter(Boolean), tags: document.getElementById('cq-tags').value.split(',').map(s=>s.trim()).filter(Boolean) };
+  try { await apiFetch('/api/admin/quotes', 'POST', body); toast('Quote created!'); closeModal('modal-create-quote'); loadQuotes(); } catch (e) { toast(e.message, 'error'); }
+}
+function openEditQuoteModal(q) {
+  document.getElementById('eq-id').value = q.id;
+  document.getElementById('eq-text').value = q.content;
+  document.getElementById('eq-author').value = q.author || '';
+  document.getElementById('eq-moods').value = (q.mood_targets||[]).join(', ');
+  document.getElementById('eq-tags').value = (q.tags||[]).join(', ');
+  openModal('modal-edit-quote');
+}
+async function saveQuoteEdit() {
+  const id = document.getElementById('eq-id').value;
+  const body = { content: document.getElementById('eq-text').value.trim(), author: document.getElementById('eq-author').value.trim() || undefined, mood_targets: document.getElementById('eq-moods').value.split(',').map(s=>s.trim()).filter(Boolean), tags: document.getElementById('eq-tags').value.split(',').map(s=>s.trim()).filter(Boolean) };
+  try { await apiFetch(`/api/admin/quotes/${id}`, 'PATCH', body); toast('Quote updated!'); closeModal('modal-edit-quote'); loadQuotes(); } catch (e) { toast(e.message, 'error'); }
+}
+async function deleteQuote(id) {
+  if (!confirm('Permanently delete this quote?')) return;
+  try { await apiFetch(`/api/admin/quotes/${id}`, 'DELETE'); toast('Quote deleted.'); loadQuotes(); } catch (e) { toast(e.message, 'error'); }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+function roleBadge(r) { const m={admin:'badge-red',counselor:'badge-blue',patient:'badge-green'}; return `<span class="badge ${m[r]||'badge-gray'}">${r}</span>`; }
+function typeBadge(t) { const m={auto:'badge-purple',manual:'badge-blue',patient_requested:'badge-yellow'}; return `<span class="badge ${m[t]||'badge-gray'}">${t}</span>`; }
+function formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}); }
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => toast('ID copied to clipboard.')).catch(() => toast('Failed to copy', 'error'));
+}
+</script>
+</body>
+</html>

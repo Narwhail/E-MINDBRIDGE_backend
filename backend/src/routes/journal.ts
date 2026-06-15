@@ -60,7 +60,7 @@ router.get('/', requireRole('patient'), async (req: Request, res: Response): Pro
 
   const { data, error } = await supabaseAdmin
     .from('journal_entries')
-    .select('id, language_code, is_analyzed, created_at, updated_at')
+    .select('id, content, language_code, is_analyzed, created_at, updated_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(limit);

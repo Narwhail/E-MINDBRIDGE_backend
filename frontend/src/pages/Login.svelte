@@ -1,9 +1,16 @@
 <script lang="ts">
-  import { login } from '../store/auth';
+  import { onMount } from 'svelte';
+  import { login, getSession } from '../store/auth';
 
   let email = '';
   let password = '';
   let error = '';
+
+  onMount(() => {
+    if (getSession()) {
+      window.location.href = "#/dashboard";
+    }
+  });
 
   function handleLogin() {
     const success = login(email, password);

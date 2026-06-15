@@ -69,15 +69,37 @@ router.post('/', requireRole('counselor'), async (req: Request, res: Response): 
     actor_id: counselor.id,
     action: 'viewed_report',
     target_table: 'ai_reports',
-    target_id: ai_report_id,
     metadata: { patient_id },
   });
+
+  // Resolve actual ai_report_id in case frontend sent a report_requests ID
+  let actualAiReportId = ai_report_id;
+  const { data: checkReport } = await supabaseAdmin
+    .from('ai_reports')
+    .select('id')
+    .eq('id', ai_report_id)
+    .maybeSingle();
+
+  if (!checkReport) {
+    const { data: checkReq } = await supabaseAdmin
+      .from('report_requests')
+      .select('fulfilled_report_id')
+      .eq('id', ai_report_id)
+      .maybeSingle();
+      
+    if (checkReq && checkReq.fulfilled_report_id) {
+      actualAiReportId = checkReq.fulfilled_report_id;
+    } else {
+      res.status(404).json({ error: 'AI Report not found. Ensure the report ID is valid.' });
+      return;
+    }
+  }
 
   // INSERT counselor_evaluations
   const { data: evaluation, error } = await supabaseAdmin
     .from('counselor_evaluations')
     .insert({
-      ai_report_id,
+      ai_report_id: actualAiReportId,
       counselor_id: counselor.id,
       patient_id,
       clinical_impression,
@@ -105,7 +127,6 @@ router.post('/', requireRole('counselor'), async (req: Request, res: Response): 
       type: 'risk_alert',
       title: '🚨 Emergency Referral',
       body: 'Your counselor has flagged this as an emergency. Please contact emergency services or a crisis hotline immediately.',
-      related_report_id: ai_report_id,
     });
 
     await supabaseAdmin.from('audit_logs').insert({
@@ -113,7 +134,7 @@ router.post('/', requireRole('counselor'), async (req: Request, res: Response): 
       action: 'emergency_referral_triggered',
       target_table: 'counselor_evaluations',
       target_id: evaluation.id,
-      metadata: { patient_id, ai_report_id },
+      metadata: { patient_id },
     });
 
     nextStepMessage = 'Emergency referral notification sent to patient.';
@@ -124,7 +145,6 @@ router.post('/', requireRole('counselor'), async (req: Request, res: Response): 
       type: 'general',
       title: 'External Referral',
       body: `Your counselor has recommended an external referral${external_referral_name ? ` to ${external_referral_name}` : ''}. Please follow up with your counselor for details.`,
-      related_report_id: ai_report_id,
     });
     nextStepMessage = 'External referral notification sent to patient.';
   } else if (next_step === 'schedule_session') {

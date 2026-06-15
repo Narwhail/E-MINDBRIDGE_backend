@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 
 import authRoutes from './routes/auth';
 import moodRoutes from './routes/mood';
@@ -14,6 +15,13 @@ import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
 import dashboardRoutes from './routes/dashboard';
 import patientRoutes from './routes/patients';
+
+// Admin Console API routes
+import { authenticate, requireRole } from './middleware/auth';
+import adminUsersRoutes from './routes/admin/users';
+import adminQuotesRoutes from './routes/admin/quotes';
+import adminAssignmentsRoutes from './routes/admin/assignments';
+import adminAuditRoutes from './routes/admin/audit';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,6 +75,18 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/patients', patientRoutes);
 
+// ─── Admin Console Routes (API) ───────────────────────────────────────────────
+app.use('/api/admin/users',       authenticate, requireRole('admin'), adminUsersRoutes);
+app.use('/api/admin/quotes',      authenticate, requireRole('admin'), adminQuotesRoutes);
+app.use('/api/admin/assignments', authenticate, requireRole('admin'), adminAssignmentsRoutes);
+app.use('/api/admin/audit',       authenticate, requireRole('admin'), adminAuditRoutes);
+
+// ─── Admin Console UI ─────────────────────────────────────────────────────────
+// Serves the self-contained Admin Console SPA at http://localhost:<PORT>/admin
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'admin', 'index.html'));
+});
+
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found.' });
@@ -81,7 +101,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`✅ E-MindBridge API running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/health`);
-  console.log(`   Gemini API:    ${process.env.GEMINI_API_KEY ? '✅ Configured' : '⚠️  Not set — using simulated responses'}`);
-  console.log(`   Supabase URL:  ${process.env.SUPABASE_URL || '❌ MISSING'}`);
+  console.log(`   Health check:   http://localhost:${PORT}/health`);
+  console.log(`   Admin console:  http://localhost:${PORT}/admin`);
+  console.log(`   Gemini API:     ${process.env.GEMINI_API_KEY ? '✅ Configured' : '⚠️  Not set — using simulated responses'}`);
+  console.log(`   Supabase URL:   ${process.env.SUPABASE_URL || '❌ MISSING'}`);
+  console.log(`   Jitsi Domain:   ${process.env.JITSI_DOMAIN || 'meet.jit.si (default)'}`);
 });

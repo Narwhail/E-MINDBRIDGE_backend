@@ -133,6 +133,48 @@ router.get('/admin/pending', requireRole('admin'), async (req: Request, res: Res
 });
 
 /**
+ * PF-05: Admin: Get processed (approved/fulfilled/rejected) report requests
+ * GET /api/reports/admin/processed?page=1&limit=10&search=
+ */
+router.get('/admin/processed', requireRole('admin'), async (req: Request, res: Response): Promise<void> => {
+  const page  = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+  const from  = (page - 1) * limit;
+  const to    = from + limit - 1;
+
+  const { data, error, count } = await supabaseAdmin
+    .from('report_requests')
+    .select(`
+      id,
+      reason,
+      date_range_start,
+      date_range_end,
+      status,
+      rejection_reason,
+      requested_at,
+      reviewed_at,
+      fulfilled_at,
+      requested_by,
+      patient_id,
+      fulfilled_report_id
+    `, { count: 'exact' })
+    .neq('status', 'pending')
+    .order('reviewed_at', { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  const total_count = count ?? 0;
+  res.json({
+    requests: data,
+    pagination: { page, limit, total_count, total_pages: Math.ceil(total_count / limit) },
+  });
+});
+
+/**
  * PF-05: Admin: Approve or reject a report request
  * PATCH /api/reports/admin/:requestId
  * Body: { action: 'approve' | 'reject', rejection_reason?: string }

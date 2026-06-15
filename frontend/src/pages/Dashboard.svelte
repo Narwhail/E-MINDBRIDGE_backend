@@ -57,11 +57,15 @@
     <div class="bg-white p-5 rounded-xl shadow">
       <h2 class="font-semibold text-gray-600">Quick Actions</h2>
 
-      <button class="w-full mt-3 bg-blue-500 text-white py-2 rounded">
+      <button 
+        on:click={() => window.location.href = "#/chat"}
+        class="w-full mt-3 bg-blue-500 text-white py-2 rounded">
         Chat with BridgeBot
       </button>
 
-      <button class="w-full mt-2 bg-green-500 text-white py-2 rounded">
+      <button 
+        on:click={() => window.location.href = "#/booking"}
+        class="w-full mt-2 bg-green-500 text-white py-2 rounded">
         Book Counselor
       </button>
     </div>

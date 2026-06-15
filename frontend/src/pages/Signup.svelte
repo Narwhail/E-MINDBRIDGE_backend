@@ -1,10 +1,17 @@
 <script lang="ts">
-  import { register } from '../store/auth';
+  import { onMount } from 'svelte';
+  import { register, getSession } from '../store/auth';
 
   let email = '';
   let password = '';
   let error = '';
   let success = '';
+
+  onMount(() => {
+    if (getSession()) {
+      window.location.href = "#/dashboard";
+    }
+  });
 
   function handleSignup() {
     const ok = register(email, password);
