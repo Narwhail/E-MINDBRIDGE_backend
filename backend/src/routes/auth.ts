@@ -10,6 +10,11 @@ const router = Router();
  * 
  * Creates a new auth user. The handle_new_user DB trigger automatically
  * creates the profile record with the role from metadata.
+ * 
+ * 
+ *    http://localhost:3000/api/auth/register
+ * 
+ * 
  */
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   const { email, password, full_name, role = 'patient' } = req.body;
