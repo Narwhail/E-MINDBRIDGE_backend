@@ -16,64 +16,94 @@ router.use(authenticate);
  *
  * Returns patient profile details along with their latest mood and session info.
  */
-router.get('/', requireRole('counselor'), async (req: Request, res: Response): Promise<void> => {
-  const counselor = (req as any).user;
+router.get('/', requireRole('counselor', 'admin'), async (req: Request, res: Response): Promise<void> => {
+  const currentUser = (req as any).user;
 
-  const page  = Math.max(parseInt(req.query.page  as string) || 1, 1);
+  const page = Math.max(parseInt(req.query.page as string) || 1, 1);
   const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
   const search = (req.query.search as string)?.trim() || '';
   const offset = (page - 1) * limit;
 
-  // Step 1: Fetch active assignment IDs for this counselor
-  const { data: assignments, error: assignError } = await supabaseAdmin
-    .from('counselor_patient_assignments')
-    .select('patient_id')
-    .eq('counselor_id', counselor.id)
-    .eq('is_active', true);
+  let patients: any[] = [];
+  let total = 0;
+  let total_pages = 0;
 
-  if (assignError) {
-    res.status(500).json({ error: assignError.message });
-    return;
+  if (currentUser.role === 'admin') {
+    // Admin retrieves all patient profiles
+    let profileQuery = supabaseAdmin
+      .from('profiles')
+      .select(
+        'id, full_name, display_name, gender, section_or_grade, school_or_org, profile_photo_url, is_active, created_at',
+        { count: 'exact' }
+      )
+      .eq('role', 'patient')
+      .order('full_name', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (search) {
+      profileQuery = profileQuery.ilike('full_name', `%${search}%`);
+    }
+
+    const { data, count, error: profileError } = await profileQuery;
+
+    if (profileError) {
+      res.status(500).json({ error: profileError.message });
+      return;
+    }
+    patients = data || [];
+    total = count ?? 0;
+    total_pages = Math.ceil(total / limit);
+  } else {
+    // Counselor retrieves assigned patient profiles
+    const { data: assignments, error: assignError } = await supabaseAdmin
+      .from('counselor_patient_assignments')
+      .select('patient_id')
+      .eq('counselor_id', currentUser.id)
+      .eq('is_active', true);
+
+    if (assignError) {
+      res.status(500).json({ error: assignError.message });
+      return;
+    }
+
+    if (!assignments || assignments.length === 0) {
+      res.json({
+        patients: [],
+        pagination: { page, limit, total: 0, total_pages: 0, has_next: false, has_prev: false },
+      });
+      return;
+    }
+
+    const patientIds = assignments.map(a => a.patient_id);
+
+    let profileQuery = supabaseAdmin
+      .from('profiles')
+      .select(
+        'id, full_name, display_name, gender, section_or_grade, school_or_org, profile_photo_url, is_active, created_at',
+        { count: 'exact' }
+      )
+      .in('id', patientIds)
+      .order('full_name', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (search) {
+      profileQuery = profileQuery.ilike('full_name', `%${search}%`);
+    }
+
+    const { data, count, error: profileError } = await profileQuery;
+
+    if (profileError) {
+      res.status(500).json({ error: profileError.message });
+      return;
+    }
+    patients = data || [];
+    total = count ?? 0;
+    total_pages = Math.ceil(total / limit);
   }
 
-  if (!assignments || assignments.length === 0) {
-    res.json({
-      patients: [],
-      pagination: { page, limit, total: 0, total_pages: 0, has_next: false, has_prev: false },
-    });
-    return;
-  }
-
-  const patientIds = assignments.map(a => a.patient_id);
-
-  // Step 2: Build paginated profile query, with optional name search
-  let profileQuery = supabaseAdmin
-    .from('profiles')
-    .select(
-      'id, full_name, display_name, gender, section_or_grade, school_or_org, profile_photo_url, is_active, created_at',
-      { count: 'exact' }
-    )
-    .in('id', patientIds)
-    .order('full_name', { ascending: true })
-    .range(offset, offset + limit - 1);
-
-  if (search) {
-    profileQuery = profileQuery.ilike('full_name', `%${search}%`);
-  }
-
-  const { data: patients, count, error: profileError } = await profileQuery;
-
-  if (profileError) {
-    res.status(500).json({ error: profileError.message });
-    return;
-  }
-
-  const total       = count ?? 0;
-  const total_pages = Math.ceil(total / limit);
-
-  // Step 3: Enrich each patient with their latest mood log
+  // Step 3: Enrich each patient with their latest mood log and active session
   const enriched = await Promise.all(
-    (patients || []).map(async (patient) => {
+    patients.map(async (patient) => {
       const { data: latestMood } = await supabaseAdmin
         .from('mood_logs')
         .select('mood, logged_at')
@@ -82,15 +112,19 @@ router.get('/', requireRole('counselor'), async (req: Request, res: Response): P
         .limit(1)
         .single();
 
-      const { data: activeSession } = await supabaseAdmin
+      let activeSessionQuery = supabaseAdmin
         .from('counseling_sessions')
         .select('id, status, scheduled_at, request_type')
         .eq('patient_id', patient.id)
-        .eq('counselor_id', counselor.id)
         .in('status', ['scheduled', 'active'])
         .order('scheduled_at', { ascending: true })
-        .limit(1)
-        .single();
+        .limit(1);
+
+      if (currentUser.role !== 'admin') {
+        activeSessionQuery = activeSessionQuery.eq('counselor_id', currentUser.id);
+      }
+
+      const { data: activeSession } = await activeSessionQuery.single();
 
       return {
         ...patient,
@@ -120,22 +154,37 @@ router.get('/', requireRole('counselor'), async (req: Request, res: Response): P
  * Returns the patient's profile, recent mood logs, recent sessions,
  * and any AI reports associated with the patient.
  */
-router.get('/:patientId', requireRole('counselor'), async (req: Request, res: Response): Promise<void> => {
-  const counselor = (req as any).user;
+router.get('/:patientId', requireRole('counselor', 'admin'), async (req: Request, res: Response): Promise<void> => {
+  const currentUser = (req as any).user;
   const { patientId } = req.params;
 
-  // Verify the counselor is actually assigned to this patient
-  const { data: assignment, error: assignError } = await supabaseAdmin
-    .from('counselor_patient_assignments')
-    .select('id, assigned_at')
-    .eq('counselor_id', counselor.id)
-    .eq('patient_id', patientId)
-    .eq('is_active', true)
-    .single();
+  let assignment: any = null;
 
-  if (assignError || !assignment) {
-    res.status(403).json({ error: 'You are not assigned to this patient.' });
-    return;
+  if (currentUser.role === 'admin') {
+    // Admin doesn't need assignment verification; load any active assignment if it exists
+    const { data } = await supabaseAdmin
+      .from('counselor_patient_assignments')
+      .select('id, assigned_at')
+      .eq('patient_id', patientId)
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+    assignment = data;
+  } else {
+    // Verify the counselor is actually assigned to this patient
+    const { data, error: assignError } = await supabaseAdmin
+      .from('counselor_patient_assignments')
+      .select('id, assigned_at')
+      .eq('counselor_id', currentUser.id)
+      .eq('patient_id', patientId)
+      .eq('is_active', true)
+      .single();
+
+    if (assignError || !data) {
+      res.status(403).json({ error: 'You are not assigned to this patient.' });
+      return;
+    }
+    assignment = data;
   }
 
   // Fetch full profile
@@ -158,14 +207,19 @@ router.get('/:patientId', requireRole('counselor'), async (req: Request, res: Re
     .order('logged_at', { ascending: false })
     .limit(7);
 
-  // Fetch last 5 sessions with this counselor
-  const { data: sessions } = await supabaseAdmin
+  // Fetch last 5 sessions
+  let sessionsQuery = supabaseAdmin
     .from('counseling_sessions')
     .select('id, status, request_type, scheduled_at, started_at, ended_at, duration_minutes')
     .eq('patient_id', patientId)
-    .eq('counselor_id', counselor.id)
     .order('scheduled_at', { ascending: false })
     .limit(5);
+
+  if (currentUser.role !== 'admin') {
+    sessionsQuery = sessionsQuery.eq('counselor_id', currentUser.id);
+  }
+
+  const { data: sessions } = await sessionsQuery;
 
   // Fetch last 3 AI reports
   const { data: aiReports } = await supabaseAdmin
@@ -178,7 +232,7 @@ router.get('/:patientId', requireRole('counselor'), async (req: Request, res: Re
   res.json({
     patient: {
       ...profile,
-      assigned_since: assignment.assigned_at,
+      assigned_since: assignment ? assignment.assigned_at : null,
     },
     recent_moods: moodLogs || [],
     recent_sessions: sessions || [],
